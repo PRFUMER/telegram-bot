@@ -11,8 +11,17 @@ from telegram.ext import (
 )
 
 # ------------------- ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ -------------------
-TOKEN = os.getenv("8555298355:AAGgRQ58Y6nVFtFkcLucCE9SUwP-1eaYbAA")       # Токен бота
-GROUP_ID = int(os.getenv("1003863562437"))     # ID группы (например -1003863562437)
+TOKEN = os.getenv("BOT_TOKEN")       # Токен бота
+GROUP_ID = int(os.getenv("GROUP_ID"))     # ID группы (например -1003863562437)
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN не найден в переменных окружения!")
+
+if not GROUP_ID:
+    raise ValueError("GROUP_ID не найден в переменных окружения!")
+
+GROUP_ID = int(GROUP_ID)
+
 
 # ------------------- ХРАНЕНИЕ ОТВЕТОВ -------------------
 ANSWERS_FILE = "answers.json"
