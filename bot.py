@@ -7,69 +7,42 @@ from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
+    JobQueue
 )
 
-# ==============================
-# Получаем переменные из Railway
-# ==============================
+# ------------------- ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ -------------------
+TOKEN = os.getenv("8555298355:AAGgRQ58Y6nVFtFkcLucCE9SUwP-1eaYbAA")       # Токен бота
+GROUP_ID = int(os.getenv("1003863562437"))     # ID группы (например -1003863562437)
 
-TOKEN = os.getenv("8555298355:AAGgRQ58Y6nVFtFkcLucCE9SUwP-1eaYbAA")
-GROUP_ID = int(os.getenv("1003863562437"))
-
-if not TOKEN:
-    raise ValueError("TOKEN не найден в переменных окружения!")
-
-if not GROUP_ID:
-    raise ValueError("GROUP_ID не найден в переменных окружения!")
-
-# ==============================
-# Загружаем ответы
-# ==============================
+# ------------------- ХРАНЕНИЕ ОТВЕТОВ -------------------
+ANSWERS_FILE = "answers.json"
 
 try:
-    with open("answers.json", "r") as f:
+    with open(ANSWERS_FILE, "r") as f:
         answers = json.load(f)
-except:
+except FileNotFoundError:
     answers = {}
 
-# ==============================
-# Функция отправки опроса
-# ==============================
-
+# ------------------- ФУНКЦИЯ ОТПРАВКИ ОПРОСНИКА -------------------
 async def send_poll(context: ContextTypes.DEFAULT_TYPE):
+    """Отправка опросника с кнопками в группу"""
     days = ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
     times_list = ["5:45 pm", "6:30 pm"]
 
     keyboard = []
     for day in days:
-        row = [
-            InlineKeyboardButton(
-                f"{day} {t}",
-                callback_data=f"{day} {t}"
-            )
-            for t in times_list
-        ]
+        row = [InlineKeyboardButton(f"{day} {t}", callback_data=f"{day} {t}") for t in times_list]
         keyboard.append(row)
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await context.bot.send_message(
         chat_id=GROUP_ID,
-        text="Choose day and time foor training:",
+        text="Choose day and time to train:",
         reply_markup=reply_markup
     )
 
-# ==============================
-# Команда /testpoll
-# ==============================
-
-async def test_poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await send_poll(context)
-
-# ==============================
-# Обработка кнопок
-# ==============================
-
+# ------------------- ОБРАБОТКА НАЖАТИЙ -------------------
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -77,31 +50,35 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(query.from_user.id)
     selected = query.data
 
+    # Сохраняем выбор пользователя
     answers[user_id] = selected
-
-    with open("answers.json", "w") as f:
+    with open(ANSWERS_FILE, "w") as f:
         json.dump(answers, f, indent=2)
 
-    await query.edit_message_text(
-        text=f"{query.from_user.first_name} chose: {selected}"
-    )
+    # Показываем пользователю, что выбор сохранён
+    await query.edit_message_text(text=f"{query.from_user.first_name} chose: {selected}")
 
-# ==============================
-# Запуск приложения
-# ==============================
+# ------------------- ТЕСТОВАЯ КОМАНДА -------------------
+async def test_poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /testpoll для ручной проверки опросника"""
+    await send_poll(context)
 
-app = ApplicationBuilder().token(TOKEN).build()
+# ------------------- ОСНОВНАЯ ЧАСТЬ -------------------
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CallbackQueryHandler(button))
-app.add_handler(CommandHandler("testpoll", test_poll))
+    # Обработчик кнопок
+    app.add_handler(CallbackQueryHandler(button))
 
-# Воскресенье = 6
-app.job_queue.run_daily(
-    send_poll,
-    time=time(20, 0),   # 20:00
-    days=(6,)
-)
+    # Команда для теста
+    app.add_handler(CommandHandler("testpoll", test_poll))
 
-print("Бот запущен. Опросник будет отправляться каждое воскресенье в 20:00.")
+    # JobQueue для опросника каждое воскресенье в 20:00
+    job_queue: JobQueue = app.job_queue
+    job_queue.run_daily(send_poll, time=time(20, 0), days=(6,))  # 6 = Sunday
 
-app.run_polling()
+    print("Бот запущен. Опросник будет отправляться каждое воскресенье в 20:00.")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
